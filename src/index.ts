@@ -223,23 +223,15 @@ export const generateStoryV2 = functions
       });
     }
 
-    let initialMessage: string =
-      "Consider a data model named 'twist' which " +
-      "represent a fraction of a story and only consist of a parameter" +
-      " 'title' of no " +
-      "more than 80 chars and a parameter 'body'" +
-      " of no more than 1200 chars. \n" +
-      "Please generate a twist containing the plot of a story of the " +
-      "following genres: \n" +
-      genres +
-      "\nAnd the following topics: \n" +
-      topics +
-      "\n I need you todeliver a JSON that has a key '0' " +
-      "containing the twist";
+    let initialMessage = `
+    Consider a data model named 'twist' which represent a fraction of a story and only consist of a parameter 'title' of no more than 80 chars and a parameter 'body' of no more than 1200 chars.
+    Please generate a twist containing the exposition of a story of the following genres: ${genres}
+    And the following topics: ${topics}
+    I need you todeliver a JSON that has a key '0' containing the generated twist.`;
 
     if (extra != undefined) {
-      initialMessage += "Please also consider the following:\n";
-      initialMessage += extra;
+      initialMessage += `Please also consider the following: 
+      ${extra}`;
     }
 
     const initialConv: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -281,14 +273,13 @@ export const generateStoryV2 = functions
       currentTwist: string,
       currentConversation: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
     ) {
-      const newMessage =
-        `For twist number ${currentTwist} please generate ${childs} ` +
-        "more twists, " +
-        "each of them will represent a different way to" +
-        ` continue twist ${currentTwist} ` +
-        "Please number each of the new twists starting from 0 " +
-        `and name them ${currentTwist} plus their number ` +
-        `(Example: '${currentTwist}0','${currentTwist}1')`;
+      const keys: string[] = [];
+      for (let x = 0; x < childs; x++) {
+        keys.push(`"${currentTwist}${x.toString()}"`);
+      }
+      const keysString = keys.join(", ");
+      const newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}.
+I need you todeliver a JSON that has the keys ${keysString}, each containing a twist`;
 
       const newConv: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
         ...currentConversation,
@@ -333,8 +324,3 @@ export const generateStoryV2 = functions
       }
     }
   });
-
-// export const generateStoryV2 = onRequest(
-//   {secrets: ["OPENAI_API_KEY"]},
-//   async (request, response) => {}
-// );
