@@ -188,7 +188,33 @@ export const uploadStory = onRequest(
         }
       }
     }
-    response.send("OK");
+    response.send(hashIdsMap);
+  }
+);
+
+export const publishStory = onRequest(
+  {secrets: ["STORY3TOKEN"]},
+  async (request, response) => {
+    const token = process.env.STORY3TOKEN;
+    const baseUrl = "https://story3.com/api/v2/";
+    const body = request.body;
+
+    for (const key in body) {
+      if (key != undefined) {
+        const hashId = body[key];
+        const res = await axios.post(
+          baseUrl + "twists/" + hashId + "/publish",
+          {},
+          {
+            headers: {
+              "x-auth-token": token,
+            },
+          }
+        );
+        console.log(key, res.data);
+      }
+    }
+    response.send("Story sent to analyzing");
   }
 );
 
@@ -372,20 +398,20 @@ export const generateStoryV3 = functions
 
     const climax = Math.trunc((deep - 1) / 2);
     const resolution = Math.trunc(deep - 1);
-    let risingAction = -1;
-    let fallingAction = -1;
+    // let risingAction = -1;
+    // let fallingAction = -1;
 
-    if (deep >= 5) {
-      risingAction = Math.trunc((deep - 1) / 4);
-      fallingAction = Math.trunc(((deep - 1) / 4) * 3);
-    }
+    // if (deep >= 5) {
+    //   risingAction = Math.trunc((deep - 1) / 4);
+    //   fallingAction = Math.trunc(((deep - 1) / 4) * 3);
+    // }
 
     let initialMessage = `
   Consider a data model named 'twist' which represent a fraction of a story and only consist of a parameter 'title' of no more than 80 chars and a parameter 'body' of no more than 1200 chars.
-  I need to create an interactive story where readers will be able to choose how to continue the narrative. The main objective of each twist is to convince the reader to keep reading.
+  I need to create an interactive story where readers will be able to choose how to continue the narrative.
   Please generate a twist containing the exposition for a story of the following genres: ${genres}
   And the following topics: ${topics}
-  I need you todeliver a JSON that has a key '0' containing the generated twist.`;
+  I need you to provide a JSON object with a key '0', which should contain the twist represented by a nested JSON object with the keys 'title' and 'body.`;
 
     if (extra != undefined) {
       initialMessage += `Please also consider the following: 
@@ -433,29 +459,36 @@ export const generateStoryV3 = functions
     ) {
       const keys: string[] = [];
       gptCalls++;
+      if (gptCalls >= 35) {
+        await new Promise((f) => setTimeout(f, 30 * 1000));
+        if (gptCalls > 35) {
+          gptCalls = 0;
+        }
+        gptCalls++;
+      }
       console.log("aqui los calls", gptCalls);
       for (let x = 0; x < childs; x++) {
         keys.push(`"${currentTwist}${x.toString()}"`);
       }
       const keysString = keys.join(", ");
-      let newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}.
+      let newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}. Twist 'title' may suggest an action to be taken.
 I need you todeliver a JSON that has the keys ${keysString}, each containing a twist`;
 
-      if (currentDeep == risingAction) {
-        console.log("Aqui el Rising Action con current deep: ", currentDeep);
-        newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}. Please include the rising action of the story on this twists.
-I need you todeliver a JSON that has the keys ${keysString}, each containing a twist`;
-      }
+      //       if (currentDeep == risingAction) {
+      //         console.log("Aqui el Rising Action con current deep: ", currentDeep);
+      //         newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}. Please include the rising action of the story on this twists.
+      // I need you todeliver a JSON that has the keys ${keysString}, each containing a twist`;
+      //       }
       if (currentDeep == climax) {
         console.log("Aqui el climax con current deep: ", currentDeep);
         newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}. Please include the climax of the story on this twists.
 I need you todeliver a JSON that has the keys ${keysString}, each containing a twist`;
       }
-      if (currentDeep == fallingAction) {
-        console.log("Aqui el fallingAction con current deep: ", currentDeep);
-        newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}. Please include the falling action of the story on this twists.
-I need you todeliver a JSON that has the keys ${keysString}, each containing a twist`;
-      }
+      //       if (currentDeep == fallingAction) {
+      //         console.log("Aqui el fallingAction con current deep: ", currentDeep);
+      //         newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}. Please include the falling action of the story on this twists.
+      // I need you todeliver a JSON that has the keys ${keysString}, each containing a twist`;
+      //       }
       if (currentDeep == resolution) {
         console.log("Aqui el resolution con current deep: ", currentDeep);
         newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}. Please include the resolution of the story on this twists.
