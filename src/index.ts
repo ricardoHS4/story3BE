@@ -1,3 +1,4 @@
+/* eslint-disable require-jsdoc */
 /* eslint-disable max-len */
 /**
  * Import function triggers from their respective submodules:
@@ -370,7 +371,16 @@ I need you todeliver a JSON that has the keys ${keysString}, each containing a t
     }
   });
 
-// This V3 introduces Rising Action, Climax, Falling Action and Resolution for the story
+/**
+ * Generates an story with only 3 branches.
+ *
+ * @param {string} instructions - How do you require the story to be generated.
+ * @param {number} childs - Number of twists per level.
+ * @param {number} deep - Number of vertical twists per branch.
+ * @param {string} extra - Extra instructions.
+ * @returns {Object} - Returns a JSON containing the generated story, ready to be used with the 'uploadStory' endpoint.
+ */
+
 export const generateStoryV3 = functions
   .runWith({
     timeoutSeconds: 540,
@@ -551,6 +561,13 @@ I need you todeliver a JSON that has the keys ${keysString}, each containing a t
     }
   });
 
+/**
+ * Generates an story with only 3 branches.
+ *
+ * @param {string} instructions - How do you require the story to be generated.
+ * @returns {Object} - Returns a JSON containing the generated story, ready to be used with the 'uploadStory' endpoint.
+ */
+
 export const generateLinearRawStory = functions
   .runWith({
     timeoutSeconds: 540,
@@ -581,28 +598,6 @@ export const generateLinearRawStory = functions
       process.env.OPENAI_API_KEY ?? ""
     );
 
-    rawStoryJson.title = title;
-
-    response.send(rawStoryJson);
-  });
-
-export const formatRawStory = functions
-  .runWith({
-    timeoutSeconds: 540,
-    secrets: ["OPENAI_API_KEY"],
-  })
-  .https.onRequest(async (request, response) => {
-    const body = request.body;
-    const story: string | undefined = body.story;
-    const title: string | undefined = body.title;
-
-    if (story == undefined) {
-      response.status(400).json({
-        message: "There is some missing parameter, please include story",
-      });
-      return;
-    }
-
     let storyJson = {
       "0": {title: ""},
     };
@@ -612,17 +607,10 @@ export const formatRawStory = functions
     console.log(splittedStory);
 
     for (const value of splittedStory) {
-      const message =
-        "Please provide a JSON with a 'title' key including a suggested title of no more than 80 characters for this paraghraph: \n" +
-        value;
-
-      const contentAsJson = await simpleJSONPromt(
-        message,
+      const title: string = await titleGenerator(
+        value,
         process.env.OPENAI_API_KEY ?? ""
       );
-
-      const title = contentAsJson.title;
-
       currentKey += "0";
       storyJson = {
         ...storyJson,
@@ -665,7 +653,7 @@ export const generateSemiLinearStory = functions
     }
 
     const story = await simpleNonJSONPromt(
-      "Generate a story about " + instructions + instructionsA ?? "",
+      "Generate a story about " + instructions,
       process.env.OPENAI_API_KEY ?? ""
     );
 
@@ -687,6 +675,37 @@ export const generateSemiLinearStory = functions
     console.log(storyEndArray);
 
     const storyIntroString: string = storyIntroArray.join("\n\n");
+    const storyEndString: string = storyEndArray.join("\n\n");
+
+    let alt0Array: string[] = [];
+
+    let branch0Title: string | undefined = undefined;
+
+    if (instructionsA != undefined) {
+      console.log("ENTRO A INSTRUCTIONS A!!!");
+      const alt0 = await simpleNonJSONPromt(
+        "Continue this story about " +
+          instructions +
+          " " +
+          (instructionsA ?? "") +
+          ": \n" +
+          storyIntroString,
+        process.env.OPENAI_API_KEY ?? ""
+      );
+      alt0Array = alt0.split("\n\n");
+
+      branch0Title = await branchTitleGenerator(
+        alt0,
+        instructionsA,
+        process.env.OPENAI_API_KEY ?? ""
+      );
+    } else {
+      branch0Title = await titleGenerator(
+        storyEndString,
+        process.env.OPENAI_API_KEY ?? ""
+      );
+    }
+
     const alt1 = await simpleNonJSONPromt(
       "Continue this story about " +
         instructions +
@@ -697,6 +716,11 @@ export const generateSemiLinearStory = functions
       process.env.OPENAI_API_KEY ?? ""
     );
     const alt1Array: string[] = alt1.split("\n\n");
+    const branch1Title = await branchTitleGenerator(
+      alt1,
+      instructionsB ?? "",
+      process.env.OPENAI_API_KEY ?? ""
+    );
 
     const alt2 = await simpleNonJSONPromt(
       "Continue this story about " +
@@ -708,6 +732,11 @@ export const generateSemiLinearStory = functions
       process.env.OPENAI_API_KEY ?? ""
     );
     const alt2Array: string[] = alt2.split("\n\n");
+    const branch2Title = await branchTitleGenerator(
+      alt2,
+      instructionsC ?? "",
+      process.env.OPENAI_API_KEY ?? ""
+    );
 
     let storyJson: LooseObject = {};
 
@@ -722,12 +751,22 @@ export const generateSemiLinearStory = functions
     let baseKey1 = currentKey;
     let baseKey2 = currentKey;
 
-    for (const value of storyEndArray) {
-      if (value.length > 20) {
-        baseKey0 += "0";
-        storyJson = {...storyJson, [baseKey0]: {body: value}};
+    if (instructionsA != undefined) {
+      for (const value of alt0Array) {
+        if (value.length > 20) {
+          baseKey0 += "0";
+          storyJson = {...storyJson, [baseKey0]: {body: value}};
+        }
+      }
+    } else {
+      for (const value of storyEndArray) {
+        if (value.length > 20) {
+          baseKey0 += "0";
+          storyJson = {...storyJson, [baseKey0]: {body: value}};
+        }
       }
     }
+
     for (const value of alt1Array) {
       if (value.length > 20) {
         baseKey1 += "1";
@@ -754,6 +793,9 @@ export const generateSemiLinearStory = functions
     }
 
     storyJson["0"]["title"] = mainTitle;
+    storyJson[currentKey + "0"]["title"] = branch0Title;
+    storyJson[currentKey + "1"]["title"] = branch1Title;
+    storyJson[currentKey + "2"]["title"] = branch2Title;
 
     response.send(storyJson);
   });
@@ -815,10 +857,72 @@ async function simpleJSONPromt(
 // eslint-disable-next-line require-jsdoc
 async function titleGenerator(body: string, apiKey: string): Promise<string> {
   const message =
-    "Please provide a JSON with a 'title' key including an engaging title, of no more than 60 characters, for this story: \n" +
-    body;
+    "Please create a short title of no more than 60 characters that convinces people to read this text: " +
+    body +
+    ". \nPlease provide a JSON with a 'title' key the created title";
 
   const contentAsJson = await simpleJSONPromt(message, apiKey);
 
   return contentAsJson.title;
 }
+
+async function branchTitleGenerator(
+  body: string,
+  instructions: string,
+  apiKey: string
+): Promise<string> {
+  const message =
+    "Please create a short title of no more than 60 characters for this text: " +
+    body +
+    "\n Title should also be related to this other text: " +
+    instructions +
+    ". \nPlease provide a JSON with a 'title' key the created title";
+
+  const contentAsJson = await simpleJSONPromt(message, apiKey);
+
+  return contentAsJson.title;
+}
+
+/**
+ * Get analytics of all of my stories.
+ *
+ * @returns {Object} - Returns a JSON containing the analytics of all of my stories.
+ */
+
+// interface StoryData {
+//   hashId: string;
+// }
+
+export const getAnalytics = onRequest(
+  {secrets: ["STORY3TOKEN"]},
+  async (request, response) => {
+    const token = process.env.STORY3TOKEN;
+    const baseUrl = "https://story3.com/api/v2/";
+
+    const resultStories = await axios.get(baseUrl + "stories/my", {
+      headers: {
+        "x-auth-token": token,
+      },
+    });
+
+    const stories = resultStories.data;
+
+    console.log("Stories", stories);
+    const result: {[key: string]: object} = {};
+
+    for (let i = 0; i < stories.length; i++) {
+      console.log("Aqui el I: ", i);
+      const tempResult = await axios.get(
+        baseUrl + "analytics/" + stories[i].hashId,
+        {
+          headers: {
+            "x-auth-token": token,
+          },
+        }
+      );
+      result[stories[i].hashId] = tempResult.data;
+    }
+
+    response.send(result);
+  }
+);
