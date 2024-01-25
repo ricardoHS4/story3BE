@@ -372,7 +372,7 @@ I need you todeliver a JSON that has the keys ${keysString}, each containing a t
   });
 
 /**
- * Generates an story with only 3 branches.
+ * Generates an story with multiple branches.
  *
  * @param {string} instructions - How do you require the story to be generated.
  * @param {number} childs - Number of twists per level.
@@ -562,7 +562,7 @@ I need you todeliver a JSON that has the keys ${keysString}, each containing a t
   });
 
 /**
- * Generates an story with only 3 branches.
+ * Generates an story with only 1 branch.
  *
  * @param {string} instructions - How do you require the story to be generated.
  * @returns {Object} - Returns a JSON containing the generated story, ready to be used with the 'uploadStory' endpoint.
@@ -926,3 +926,4 @@ export const getAnalytics = onRequest(
     response.send(result);
   }
 );
+
