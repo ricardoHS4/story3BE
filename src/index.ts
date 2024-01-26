@@ -20,138 +20,6 @@ interface LooseObject {
   [key: string]: any;
 }
 
-export const gptJsonMode = onRequest(
-  {secrets: ["OPENAI_API_KEY"]},
-  async (request, response) => {
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-
-    const completion = await openai.chat.completions.create({
-      model: gptModel,
-      response_format: {type: "json_object"},
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant designed to output JSON.",
-        },
-        {
-          role: "user",
-          content: request.body.message,
-        },
-      ],
-    });
-
-    const message = completion.choices[0].message;
-
-    console.log(message);
-    response.send(message.content);
-  }
-);
-
-export const gptNormalMode = onRequest(
-  {secrets: ["OPENAI_API_KEY"]},
-  async (request, response) => {
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-
-    const completion = await openai.chat.completions.create({
-      model: gptModel,
-      messages: [
-        {
-          role: "user",
-          content: request.body.message,
-        },
-      ],
-    });
-
-    const message = completion.choices[0].message;
-
-    console.log(message);
-    response.send(message.content);
-  }
-);
-
-export const generateStory = onRequest(
-  {secrets: ["OPENAI_API_KEY"]},
-  async (request, response) => {
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-
-    const body = request.body;
-    const genres: string | undefined = body.genres;
-    const topics: string | undefined = body.topics;
-    const childs: number | undefined = body.childs;
-    const deep: number | undefined = body.deep;
-    const extra: string | undefined = body.extra;
-
-    if (
-      genres == undefined ||
-      topics == undefined ||
-      childs == null ||
-      deep == null
-    ) {
-      response.status(400).json({
-        message: `There is some missing parameter, please include
-         genres, topics, childs and deep`,
-      });
-    }
-
-    let message: string =
-      "Please create an interactive story of the following genres: \n" +
-      genres +
-      " \nAnd of the following topics: \n" +
-      topics;
-
-    message +=
-      " \nWe will have a basic data model named 'twist' which " +
-      "will contain a 'title' of no more than 80 chars and a 'body' of no " +
-      "more than 1200 chars. Each twist contain a fraction of the story and " +
-      "below each twist there can be more twists which will represent " +
-      "decisions or paths that the reader can choose. \nEach twist will " +
-      "have a name containing the names of all of its parent twists, and " +
-      "it's own twist number, starting from twist '0' which will contain " +
-      "the plot. Below tiwst '0' we will have twist '00', '01', '02' and " +
-      "so on, depending on how many childs for each twist we determine. " +
-      "Then at a third level we will have twists '000', '001', '002', " +
-      "and so on. \nPlease deliver a story with ";
-
-    message += childs?.toString();
-    message +=
-      " child twists for each of the twists and " + "a maximun deep level of ";
-    message += deep?.toString();
-    message +=
-      " twists. \nI need you todeliver a JSON that has a key " +
-      "for each of the twists names. Twist names must only include numbers";
-    if (extra != undefined) {
-      message += "Please also consider the following:\n";
-      message += extra;
-    }
-
-    const completion = await openai.chat.completions.create({
-      model: gptModel,
-      response_format: {type: "json_object"},
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant designed to output JSON.",
-        },
-        {
-          role: "user",
-          content: message,
-        },
-      ],
-    });
-
-    const storyJson = completion.choices[0].message;
-
-    console.log(storyJson);
-    response.send(storyJson.content);
-  }
-);
-
 /**
  * Uploads an story to Story3.
  *
@@ -393,8 +261,6 @@ export const generateStoryV3 = functions
     });
 
     const body = request.body;
-    // const genres: string | undefined = body.genres;
-    // const topics: string | undefined = body.topics;
     const instructions: string | undefined = body.instructions;
     const childs: number | undefined = body.childs;
     const deep: number = body.deep ?? 0;
@@ -404,8 +270,6 @@ export const generateStoryV3 = functions
     let gptCalls = 0;
 
     if (
-      // genres == undefined ||
-      // topics == undefined ||
       childs == undefined ||
       deep == 0
     ) {
@@ -419,13 +283,6 @@ export const generateStoryV3 = functions
 
     const climax = Math.trunc((deep - 1) / 2);
     const resolution = Math.trunc(deep - 1);
-    // let risingAction = -1;
-    // let fallingAction = -1;
-
-    // if (deep >= 5) {
-    //   risingAction = Math.trunc((deep - 1) / 4);
-    //   fallingAction = Math.trunc(((deep - 1) / 4) * 3);
-    // }
 
     let initialMessage =
       "Consider a data model named 'twist' which represent a fraction of a story and only consist of a parameter 'title' of no more than 80 chars and a parameter 'body' of no more than 1200 chars." +
@@ -493,21 +350,11 @@ export const generateStoryV3 = functions
       let newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}. Twist 'title' may suggest an action to be taken.
 I need you todeliver a JSON that has the keys ${keysString}, each containing a twist`;
 
-      //       if (currentDeep == risingAction) {
-      //         console.log("Aqui el Rising Action con current deep: ", currentDeep);
-      //         newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}. Please include the rising action of the story on this twists.
-      // I need you todeliver a JSON that has the keys ${keysString}, each containing a twist`;
-      //       }
       if (currentDeep == climax) {
         console.log("Aqui el climax con current deep: ", currentDeep);
         newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}. Please include the climax of the story on this twists.
 I need you todeliver a JSON that has the keys ${keysString}, each containing a twist`;
       }
-      //       if (currentDeep == fallingAction) {
-      //         console.log("Aqui el fallingAction con current deep: ", currentDeep);
-      //         newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}. Please include the falling action of the story on this twists.
-      // I need you todeliver a JSON that has the keys ${keysString}, each containing a twist`;
-      //       }
       if (currentDeep == resolution) {
         console.log("Aqui el resolution con current deep: ", currentDeep);
         newMessage = `For twist ${currentTwist} please generate ${childs} more twists, each of them will represent a different way to continue twist ${currentTwist}. Please include the resolution of the story on this twists.
@@ -926,4 +773,3 @@ export const getAnalytics = onRequest(
     response.send(result);
   }
 );
-
